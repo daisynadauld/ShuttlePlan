@@ -1,35 +1,110 @@
 # email_processor.py
-import re
+import base64
+from gmail import GmailAPI
 
 class EmailProcessor:
+    """Extract emails and get the detials from the emails we are interested in"""
+
     def __init__(self):
-        pass
+        self.data_dict = {}
 
-    def extract_details(self, email):
-        # Implement the logic to extract relevant details from the email
-        # You can use regular expressions, string parsing, or any other method
-        # Return a dictionary or object containing the extracted details
+    def start_process(self):
+        # Create instance of the API module
+        gmail_api = GmailAPI()
+        # Build the gmail service
+        gmail_service = gmail_api.build_gmail()
+        # Fetch email details
+        emails = gmail_api.fetch_emails(gmail_service)
 
-        subject = self.extract_subject(email)
-        body = self.extract_body(email)
+        subject_of_interest = ['Fwd: You got a new booking!']
+        booking_emails = []
+        e_id = 0
 
-        details = {
-            'subject': subject,
-            'body': body
-        }
+        if not emails:
+            print("No emails found.")
+        else:
+            for email in emails:
+                # Extract relevant information from the email
+                msg = gmail_service.users().messages().get(userId="me", id=email["id"]).execute()
+                email_data = msg["payload"]["headers"]
+                for values in email_data:
+                    name = values["name"]
+                    if name == "From":
+                        from_name = values["value"]
+                        #print(from_name)
+                        subject = [j["value"] for j in email_data if j["name"] == "Subject"]
 
-        return details
+                # Get the body of the email
+                try:
+                    for p in msg["payload"]["parts"]:
+                        if p["mimeType"] in ["text/plain"]:
+                            data = base64.urlsafe_b64decode(p["body"]["data"]).decode("utf-8")
+                except KeyError:
+                    pass
+                
+                # Keep only the emails we are interested in
+                if subject == subject_of_interest:
+                    booking_emails.append(data)
+                    e_id + 1
+        return booking_emails
+    
+    def set_data_dict(self, booking_emails):
+        # Here we assign information to variables for later use
+        id = 0
+        for booking_email in booking_emails:
+            client_name = self.extract_information(booking_email, "Name: ", "Email: ")
+            client_email = self.extract_information(booking_email, "Email: ", "Phone Number: ")
+            client_phone_number = self.extract_information(booking_email, "Phone Number: ", "Number of Vehicles in your party: ")
+            emergency_contact = self.extract_information(booking_email, "Emergency Contact Name: ", "Emergency Contact Relation: ")
+            emergency_contact_relation = self.extract_information(booking_email, "Emergency Contact Relation: ", "Emergency Contact Phone Number: ")
+            emergency_contact_number = self.extract_information(booking_email, "Emergency Contact Phone Number: ", "I authorize")
+            vehicle_make = self.extract_information(booking_email, "Vehicle Make: ", "Vehicle Model: ")
+            vehicle_model = self.extract_information(booking_email, "Vehicle Model: ", "License Plate: ")
+            license_plate = self.extract_information(booking_email, "License Plate: ", "Vehicle Year: ")
+            vehicle_year = self.extract_information(booking_email, "Vehicle Year: ", "Vehicle Description (please include if you have a trailer): ")
+            vehicle_description = self.extract_information(booking_email, "Vehicle Description (please include if you have a trailer): ",
+                                                    "Where will you leave your keys for us to find upon pickup?: ")
+            key_drop = self.extract_information(booking_email, "Where will you leave your keys for us to find upon pickup?: ", "I understand")
 
-    def extract_subject(self, email):
-        # Implement the logic to extract the subject from the email
-        # Return the extracted subject
+            # this is in case there are no special requests
+            
+            take_out_date = self.extract_information(booking_email, "What date are you taking out?: ", 
+                                            "Any special requests, pointers, or other information for us?: ")
+            special_requests = self.extract_information(booking_email, "Any special requests, pointers, or other information for us?: ", 
+                                            "What amount")
+            if take_out_date == None:
+                take_out_date = self.extract_information(booking_email, "What date are you taking out?: ", 
+                                                "What amount")
+                special_requests = " "
 
-        return email.subject
+            service_title = self.extract_information(booking_email, "Service Title: ", "With: Frank Church")
+            put_in_date = self.extract_information(booking_email, "When: ", "Where: ")
 
-    def extract_body(self, email):
-        # Implement the logic to extract the body content from the email
-        # Return the extracted body content
+            info_list = [client_name, client_email, client_phone_number, emergency_contact, emergency_contact_relation, emergency_contact_number,
+            vehicle_make, vehicle_model, license_plate, vehicle_year, vehicle_description, key_drop, take_out_date,
+            special_requests, service_title, put_in_date]
 
-        return email.body
+            self.data_dict[id] = info_list
+            id = id + 1
+    
+    def extract_information(self, text, start_word, end_word):
+        # Extracting the most important information from the email into a useable form
 
-    # Implement other methods for email processing, if required
+        start_index = text.find(start_word)
+        if start_index == -1:
+            print("Start keyword not found.")
+            return None
+        
+        end_index = text.find(end_word, start_index)
+        if end_index == -1:
+            print("End keyword not found.")
+            return None
+        
+        extracted_info = text[start_index + len(start_word):end_index].strip()
+
+        return extracted_info
+
+    def get_data_dict(self):
+        return self.data_dict
+       
+

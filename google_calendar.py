@@ -1,3 +1,4 @@
+# google_calendar.py
 from __future__ import print_function
 
 import os.path
@@ -9,9 +10,9 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # If modifying these scopes, delete the file token.json.
-SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-class GmailAPI:
+class CalendarAPI:
     def __init__(self):
         self
 
@@ -20,8 +21,8 @@ class GmailAPI:
         # The file token.json stores the user's access and refresh tokens, and is
         # created automatically when the authorization flow completes for the first
         # time.
-        if os.path.exists('gmailtoken.json'):
-            creds = Credentials.from_authorized_user_file('gmailtoken.json', SCOPES)
+        if os.path.exists('calendartoken.json'):
+            creds = Credentials.from_authorized_user_file('calendartoken.json', SCOPES)
         # If there are no (valid) credentials available, let the user log in.
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
@@ -31,26 +32,19 @@ class GmailAPI:
                     'credentials.json', SCOPES)
                 creds = flow.run_local_server(port=0)
             # Save the credentials for the next run
-            with open('gmailtoken.json', 'w') as token:
+            with open('calendartoken.json', 'w') as token:
                 token.write(creds.to_json())
 
         return creds
 
-    def build_gmail(self):
-        """Opens up Gmail and does the authentication."""
+    def build_calendar(self):
+        """Opens up Calendar and does the authentication."""
         creds = self.get_credentials()
 
-        # Call the Gmail API
-        service = build('gmail', 'v1', credentials=creds)
-        return service
-
-    def fetch_emails(self, service):
-        # Extract and return a list of email objects
-        LABEL_ID = 'INBOX'
         try:
-            emails = service.users().messages().list(userId='me', labelIds=[LABEL_ID]).execute()
-            messages = emails.get('messages', [])
-        except HttpError:
-            print('An error occurred while trying to fetch emails')
-
-        return messages
+            # Call the Calendar API
+            service = build('calendar', 'v3', credentials=creds)
+            return service
+        except:
+            print("Error: Could not build calendar")
+            exit()

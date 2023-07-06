@@ -1,40 +1,28 @@
-from googleapiclient.discovery import build
-from google.oauth2.credentials import Credentials
+import base64
+from email_processor import EmailProcessor
+#from drive import DriveAPI
+from event_creator import EventCreator
 
-from gmail import GmailAPI
-from drive import DriveAPI
-from calendar import CalendarAPI
+"""First step is to extract emails and get the emails/information we are interested in"""
 
-# Load API credentials from credentials.json
-credentials = Credentials.from_authorized_user_file('credentials.json')
+email_processer = EmailProcessor()
 
-# Create instances of the API modules
-gmail_api = GmailAPI(credentials)
-drive_api = DriveAPI(credentials)
-calendar_api = CalendarAPI(credentials)
+booking_emails = email_processer.start_process()
+data = email_processer.set_data_dict(booking_emails)
+data_dict = email_processer.get_data_dict()
 
-# Fetch email details
-emails = gmail_api.fetch_emails()
+print(data_dict)
 
-for email in emails:
-    # Extract relevant information from the email
-    email_subject = email.get_subject()
-    email_body = email.get_body()
+for i in data_dict:
+    event_data = data_dict[i]
+          
+    """The Second step is to create a new calendar event for each booking with details from the email"""
 
+    event_creator = EventCreator()
+    calendar_service = event_creator.start_process()
+    event_creator.create_booking_event(calendar_service, event_data)
+
+"""The last step is to create a folder in Google Drive with the client's name/service date and fill 
+it with client information"""
     # Create a new folder in Google Drive
-    folder_id = drive_api.create_folder(email_subject)
-
-    # Create a Google Calendar event
-    event_data = {
-        'summary': email_subject,
-        'description': email_body,
-        'start': {
-            'dateTime': '2023-05-27T10:00:00',
-            'timeZone': 'Your Timezone',
-        },
-        'end': {
-            'dateTime': '2023-05-27T12:00:00',
-            'timeZone': 'Your Timezone',
-        },
-    }
-    calendar_api.create_event(event_data)
+    #folder_id = drive_api.create_folder(email_sender)
